@@ -1,4 +1,4 @@
 fastapi
 pymongo
-dotenv
+python-dotenv
 os
