@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request, HTTPException
 from pymongo.mongo_client import MongoClient
-app= FastAPI()
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 load_dotenv()
@@ -8,11 +8,24 @@ from pydantic import BaseModel, Field
 from bson.objectid import ObjectId
 
 from database_handler import Address, Student, getCollectionInstance
+app= FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # or specify your origins
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+)
 UNIQUE_ID_NUMBER=0
 
 collections=getCollectionInstance()
 
 # Completed
+@app.post('/')
+async def default_route():
+    return {
+        "message":"Welcome to my Server!"
+    }
 @app.post('/students')
 async def readData(request: Student):
     try:
