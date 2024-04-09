@@ -21,6 +21,11 @@ UNIQUE_ID_NUMBER=0
 collections=getCollectionInstance()
 
 # Completed
+@app.head('/')
+async def default_route():
+    return {
+        "message":"Welcome to my Server!"
+    }
 @app.get('/')
 async def default_route():
     return {
