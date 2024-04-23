@@ -1,10 +1,11 @@
-from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi import FastAPI, Request, HTTPException, Depends, BackgroundTasks
 from pymongo.mongo_client import MongoClient
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 import json
 from datetime import date
+import datetime
 load_dotenv()
 from pydantic import BaseModel, Field
 from bson.objectid import ObjectId
@@ -23,8 +24,13 @@ UNIQUE_ID_NUMBER=0
 
 collections=getCollectionInstance() 
 
+# Taking from env variable
 RATE_LIMIT = os.getenv('RATE_LIMIT')
+
+CLEANUP_METHOD_INITIATED = False
+
 redis_pool = None
+
 
 
 #Created Redis Pool Function
@@ -34,8 +40,22 @@ async def get_redis_pool():
         redis_pool = redis.Redis(host=os.getenv('REDIS_HOST'), porst=os.getenv('REDIS_PORT'))
     return redis_pool
 
-# app.dependency(get_redis_pool)
-
+# To periodically clear datastore after 00:00:00
+async def periodically_clean_redis_server():
+    '''
+    We need to manually hit the get('/') route to initiate this functionality once
+    '''
+    global CLEANUP_METHOD_INITIATED
+    global redis_pool
+    if not CLEANUP_METHOD_INITIATED:
+        CLEANUP_METHOD_INITIATED=True
+        while True:
+            current_time = str(datetime.datetime.now()).split(" ")[1].split(".")[0]
+            print(current_time)
+            if current_time=="00:00:00":
+                if redis_pool!=None:
+                    redis_pool.flushall()
+            await asyncio.sleep(0.5)
 
 # Better if we implement this as feature flag instead of normal functionality as if there is any issue we just need to disable the flag to revert back to normal previous build
 @app.middleware
@@ -52,7 +72,7 @@ async def feature_add_rate_limit(request:Request, call_next):
 
     user_data = await redis_pool.get(user_id)
 
-    # Condition to check if there is no user_data or the date is already crossed span of one day, -> This will decrease the time complexity of overall process, as we will not clear the data as a whole from redis pool after the day ends.
+    # Condition to check if there is no user_data or the date is already crossed span of one day, -> This will decrease the time complexity of overall process, as we will not clear the data as a whole from redis pool after the day ends. we can use this if  we dont want to have periodically_clean_redis_server function.
     if user_data == None or user_data["date"] != str(date.today()):
         user_data = json.dumps({"current_calls": 0, "date":str(date.today())})
         redis_pool.set(user_id,user_data)
@@ -79,7 +99,8 @@ async def default_route():
         "message":"Welcome to my Server!"
     }
 @app.get('/')
-async def default_route():
+async def default_route(background_tasks: BackgroundTasks):
+    background_tasks.add_task(periodically_clean_redis_server)
     return {
         "message":"Welcome to my Server!"
     }
