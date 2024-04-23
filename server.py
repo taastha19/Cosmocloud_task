@@ -39,6 +39,7 @@ app.dependency(get_redis_pool)
 # Better if we implement this as feature flag instead of normal functionality as if there is any issue we just need to disable the flag to revert back to normal previous build
 @app.middleware
 async def feature_add_rate_limit(request:Request, call_next, redis_pool: aioredis.Redis = Depends()):
+    global RATE_LIMIT
     #Added feature flag for this rate limiting feature
     if os.getenv("FEATURE_RATE_LIMITING") == "OFF" or os.getenv('FEATURE_RATE_LIMITING') == None:
         call_next(request)
