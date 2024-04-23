@@ -6,3 +6,4 @@ uvicorn
 aioredis
 datetime
 json
+redis
