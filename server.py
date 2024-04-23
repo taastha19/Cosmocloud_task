@@ -26,6 +26,7 @@ RATE_LIMIT = os.getenv('RATE_LIMIT')
 redis_pool = None
 
 
+#Created Redis Pool Function
 async def get_redis_pool():
     global redis_pool
     if redis_pool is None:
@@ -35,11 +36,19 @@ async def get_redis_pool():
 app.dependency(get_redis_pool)
 
 
+# Better if we implement this as feature flag instead of normal functionality as if there is any issue we just need to disable the flag to revert back to normal previous build
 @app.middleware
 async def feature_add_rate_limit(request:Request, call_next, redis_pool: aioredis.Redis = Depends()):
+    #Added feature flag for this rate limiting feature
+    if os.getenv("FEATURE_RATE_LIMITING") == "OFF" or os.getenv('FEATURE_RATE_LIMITING') == None:
+        call_next(request)
+
+    # Fetch UserID from request headers
     user_id = request.headers.get('user_id')
 
     user_data = await redis_pool.get(user_id)
+
+    # Condition to check if there is no user_data or the date is already crossed span of one day, -> This will decrease the time complexity of overall process, as we will not clear the data as a whole from redis pool after the day ends.
     if user_data == None or user_data["date"] != str(date.today()):
         user_data = json.dumps({"current_calls": 0, "date":str(date.today())})
         redis_pool.set(user_id,user_data)

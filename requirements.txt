@@ -3,3 +3,6 @@ pymongo
 python-dotenv
 gunicorn
 uvicorn
+aioredis
+datetime
+json
