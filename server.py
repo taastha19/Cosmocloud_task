@@ -1,12 +1,14 @@
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Depends
 from pymongo.mongo_client import MongoClient
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
+import json
+from datetime import date
 load_dotenv()
 from pydantic import BaseModel, Field
 from bson.objectid import ObjectId
-
+import aioredis
 from database_handler import Address, Student, getCollectionInstance
 app= FastAPI()
 app.add_middleware(
@@ -19,6 +21,43 @@ app.add_middleware(
 UNIQUE_ID_NUMBER=0
 
 collections=getCollectionInstance() 
+
+RATE_LIMIT = os.getenv('RATE_LIMIT')
+redis_pool = None
+
+
+async def get_redis_pool():
+    global redis_pool
+    if redis_pool is None:
+        redis_pool = await aioredis.create_redis_pool(os.getenv('REDIS_URL'))
+    return redis_pool
+
+app.dependency(get_redis_pool)
+
+
+@app.middleware
+async def feature_add_rate_limit(request:Request, call_next, redis_pool: aioredis.Redis = Depends()):
+    user_id = request.headers.get('user_id')
+
+    user_data = await redis_pool.get(user_id)
+    if user_data == None or user_data["date"] != str(date.today()):
+        user_data = json.dumps({"current_calls": 0, "date":str(date.today())})
+        redis_pool.set(user_id,user_data)
+        
+    if user_data["current_calls"]>=RATE_LIMIT:
+        return {
+            "message":"API LIMIT EXCEEDED"
+        }
+    
+    user_data["current_calls"] += 1
+    
+    redis_pool.set(user_id, json.dumps(user_data))
+    redis_pool.set(user_id, user_data)
+
+    response = await call_next(request)
+    return response
+
+
 
 # Completed
 @app.head('/')
