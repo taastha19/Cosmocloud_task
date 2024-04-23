@@ -9,6 +9,7 @@ load_dotenv()
 from pydantic import BaseModel, Field
 from bson.objectid import ObjectId
 import aioredis
+import redis
 from database_handler import Address, Student, getCollectionInstance
 app= FastAPI()
 app.add_middleware(
@@ -30,19 +31,21 @@ redis_pool = None
 async def get_redis_pool():
     global redis_pool
     if redis_pool is None:
-        redis_pool = await aioredis.create_redis_pool(os.getenv('REDIS_URL'))
+        redis_pool = redis.Redis(host=os.getenv('REDIS_HOST'), porst=os.getenv('REDIS_PORT'))
     return redis_pool
 
-app.dependency(get_redis_pool)
+# app.dependency(get_redis_pool)
 
 
 # Better if we implement this as feature flag instead of normal functionality as if there is any issue we just need to disable the flag to revert back to normal previous build
 @app.middleware
-async def feature_add_rate_limit(request:Request, call_next, redis_pool: aioredis.Redis = Depends()):
+async def feature_add_rate_limit(request:Request, call_next):
     global RATE_LIMIT
+    redis_pool = await get_redis_pool()
     #Added feature flag for this rate limiting feature
     if os.getenv("FEATURE_RATE_LIMITING") == "OFF" or os.getenv('FEATURE_RATE_LIMITING') == None:
-        call_next(request)
+        response = await call_next(request)
+        return response
 
     # Fetch UserID from request headers
     user_id = request.headers.get('user_id')
