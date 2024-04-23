@@ -18,7 +18,7 @@ app.add_middleware(
 )
 UNIQUE_ID_NUMBER=0
 
-collections=getCollectionInstance()
+collections=getCollectionInstance() 
 
 # Completed
 @app.head('/')
