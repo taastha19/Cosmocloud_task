@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from bson.objectid import ObjectId
 import aioredis
 import redis
+import asyncio
 from database_handler import Address, Student, getCollectionInstance
 app= FastAPI()
 app.add_middleware(
